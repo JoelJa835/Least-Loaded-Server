@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import math
+
+# Function to predict server loads
+def predict_server_loads(path):
+    data = pd.read_csv(path, header=None)
+    data = np.array(data)
+    return data
+
+# # Function to implement Multiplicative Weights with Experts
+# def MW_experts(data, T):
+#     n_servers = len(data[0])
+#     weights = np.ones(n_servers)
+#     predictions = []
+#     for t in range(T):
+#         if t == 0:
+#             eta = math.sqrt(math.log(n_servers))
+#         else:
+#             eta = math.sqrt(math.log(n_servers) / t)
+#         # Compute weighted average of server loads
+#         weighted_loads = np.dot(weights, data[t])
+#         # Update weights based on expert advice
+#         for i in range(n_servers):
+#             weights[i] *= math.exp(-eta * data[t][i])
+#         # Normalize weights
+#         sum_weights = sum(weights)
+#         weights = [w / sum_weights for w in weights]
+#         # Predict least loaded server
+#         predicted_server = np.argmin(weighted_loads)
+#         predictions.append(predicted_server)
+#     return predictions
+
+# # Function to implement Multiplicative Weights with Bandit
+# def MW_bandit(data, T):
+#     n_servers = len(data[0])
+#     weights = np.ones(n_servers)
+#     predictions = []
+#     for t in range(T):
+#         if t == 0:
+#             eta = math.sqrt(math.log(n_servers))
+#         else:
+#             eta = math.sqrt(math.log(n_servers) / t)
+#         # Predict least loaded server
+#         predicted_server = np.random.choice(n_servers, p=weights / sum(weights))
+#         predictions.append(predicted_server)
+#         # Update weights based on actual loss
+#         actual_loss = np.zeros(n_servers)
+#         actual_loss[np.argmin(data[t])] = 1
+#         for i in range(n_servers):
+#             weights[i] *= math.exp(-eta * actual_loss[i])
+#         # Normalize weights
+#         sum_weights = sum(weights)
+#         weights = [w / sum_weights for w in weights]
+#     return predictions
+
+
+# # Function to implement Upper Confidence Bound with Bandit
+# def UCB_bandit(data, T, alpha):
+#     n_servers = len(data[0])
+#     sum_rewards = np.zeros(n_servers)
+#     n_plays = np.zeros(n_servers)
+#     predictions = []
+#     for t in range(T):
+#         # Compute UCB values for all servers
+#         ucbs = np.zeros(n_servers)
+#         for i in range(n_servers):
+#             if n_plays[i] == 0:
+#                 ucbs[i] = np.inf
+#             else:
+#                 ucbs[i] = sum_rewards[i] / n_plays[i] + alpha * np.sqrt(np.log(t+1) / (n_plays[i] + 1e-6))
+#         # Choose server with highest UCB value
+#         predicted_server = np.argmax(ucbs)
+#         predictions.append(predicted_server)
+#         # Update sum_rewards and n_plays based on actual loss
+#         actual_loss = np.zeros(n_servers)
+#         actual_loss[np.argmin(data[t])] = 1
+#         sum_rewards -= actual_loss
+#         sum_rewards[predicted_server] += 1 - actual_loss[predicted_server]
+#         n_plays[predicted_server] += 1
+#     return predictions
+
+
+# # Function to calculate cumulative regret
+# def calculate_cumulative_regret(actual, predicted):
+#     regret = np.zeros(len(actual))
+#     for t in range(len(actual)):
+#         regret[t] = actual[t] - predicted[t]
+#     cumulative_regret = np.cumsum(regret)
+#     return cumulative_regret
+
+
+def MW_experts_cum_regret(data, T):
+    n_servers = len(data[0])
+    weights = np.ones(n_servers)
+    regret = 0
+    for t in range(T):
+        if t == 0:
+            eta = math.sqrt(math.log(n_servers))
+        else:
+            eta = math.sqrt(math.log(n_servers) / t)
+        # Compute weighted average of server loads
+        weighted_loads = np.dot(weights, data[t])
+        # Update weights based on expert advice
+        for i in range(n_servers):
+            weights[i] *= math.exp(-eta * data[t][i])
+        # Normalize weights
+        sum_weights = sum(weights)
+        weights = [w / sum_weights for w in weights]
+        # Predict least loaded server
+        predicted_server = np.argmin(weighted_loads)
+        actual_server = np.argmin(data[t])
+        regret += data[t][actual_server] - data[t][predicted_server]
+    return regret
+
+def MW_bandit_cum_regret(data, T):
+    n_servers = len(data[0])
+    weights = np.ones(n_servers)
+    regret = 0
+    for t in range(T):
+        if t == 0:
+            eta = math.sqrt(math.log(n_servers))
+        else:
+            eta = math.sqrt(math.log(n_servers) / t)
+        # Predict least loaded server
+        predicted_server = np.random.choice(n_servers, p=weights / sum(weights))
+        # Calculate regret
+        actual_loss = np.zeros(n_servers)
+        actual_loss[np.argmin(data[t])] = 1
+        weighted_loss = np.dot(weights, actual_loss)
+        least_loaded_weighted = np.min(np.dot(data[t], weights))
+        regret += least_loaded_weighted - weighted_loss
+        # Update weights based on actual loss
+        for i in range(n_servers):
+            weights[i] *= math.exp(-eta * actual_loss[i])
+        # Normalize weights
+        sum_weights = sum(weights)
+        weights = [w / sum_weights for w in weights]
+    return regret
+
+# def UCB_bandit_cum_regret(data, T, alpha):
+#     n_servers = len(data[0])
+#     sum_rewards = np.zeros(n_servers)
+#     n_plays = np.zeros(n_servers)
+#     regrets = []
+#     for t in range(T):
+#         # Compute UCB values for all servers
+#         ucbs = np.zeros(n_servers)
+#         for i in range(n_servers):
+#             if n_plays[i] == 0:
+#                 ucbs[i] = np.inf
+#             else:
+#                 ucbs[i] = sum_rewards[i] / n_plays[i] + alpha * np.sqrt(np.log(t+1) / (n_plays[i] + 1e-6))
+#         # Choose server with highest UCB value
+#         predicted_server = np.argmax(ucbs)
+#         # Compute actual rewards
+#         actual_rewards = 1 - data[t]
+#         # Update sum_rewards and n_plays based on actual rewards
+#         sum_rewards[predicted_server] += actual_rewards[predicted_server]
+#         n_plays[predicted_server] += 1
+#         # Compute regret and add to regrets list
+#         regret = max(data[t]) - data[t][predicted_server]
+#         regrets.append(regret)
+#     # Compute and return cumulative regret
+#     cum_regret = sum(regrets)
+#     return cum_regret
+def UCB_bandit_cum_regret(data, T, alpha):
+    n_servers = len(data[0])
+    sum_rewards = np.zeros(n_servers)
+    n_plays = np.zeros(n_servers)
+    regrets = []
+    for t in range(T):
+        # Compute UCB values for all servers
+        ucbs = np.zeros(n_servers)
+        for i in range(n_servers):
+            if n_plays[i] == 0:
+                ucbs[i] = np.inf
+            else:
+                ucb = sum_rewards[i] / n_plays[i] + alpha * np.sqrt(np.log(t+1) / (n_plays[i] + 1e-6))
+                ucbs[i] = ucb
+        # Choose server with highest UCB value
+        predicted_server = np.argmax(ucbs)
+        # Compute actual rewards
+        actual_rewards = 1 - data[t]
+        # Update sum_rewards and n_plays based on actual rewards
+        sum_rewards[predicted_server] += actual_rewards[predicted_server]
+        n_plays[predicted_server] += 1
+        # Compute regret and add to regrets list
+        regret = max(data[t]) - data[t][predicted_server]
+        regrets.append(regret)
+    # Compute and return cumulative regret
+    cum_regret = sum(regrets)
+    return cum_regret
+
+
+# Load dataset
+data = predict_server_loads('Milano_timeseries.csv')
+data = np.transpose(data)
+
+# Horizon values
+T = [1000, 7000]
+
+# Calculate cumulative regrets
+MW_experts_regret = []
+MW_bandit_regret = []
+UCB_bandit_regret = []
+for t in T:
+    MW_experts_regret.append(MW_experts_cum_regret(data, t))
+    MW_bandit_regret.append(MW_bandit_cum_regret(data, t))
+    UCB_bandit_regret.append(UCB_bandit_cum_regret(data, t, alpha=0.1))
+
+# Plot cumulative regrets
+plt.plot(T, MW_experts_regret, label='MW experts')
+plt.plot(T, MW_bandit_regret, label='MW bandit')
+plt.plot(T, UCB_bandit_regret, label='UCB bandit')
+plt.legend()
+plt.xlabel('Horizon T')
+plt.ylabel('Cumulative regret')
+plt.show()
+
+
+# # Load dataset
+# data = predict_server_loads('Milano_timeseries.csv')
+# data = np.transpose(data)
+
+# # Horizon values
+# T1 = 1000
+# T2 = 7000
+
+
+# # Exploration parameter for UCB algorithm
+# alpha = 2
+
+# # Actual least loaded server for each time round
+# actual = np.argmin(data, axis=1)
+
+# # Multiplicative Weights with Experts
+# MW_experts_predictions_T1 = MW_experts(data, T1)
+# MW_experts_predictions_T2 = MW_experts(data, T2)
+
+# # Multiplicative Weights with Bandit
+# MW_bandit_predictions_T1 = MW_bandit(data, T1)
+# MW_bandit_predictions_T2 = MW_bandit(data, T2)
+
+# # Upper Confidence Bound with Bandit
+# UCB_predictions_T1 = UCB_bandit(data, T1, alpha)
+# UCB_predictions_T2 = UCB_bandit(data, T2, alpha)
+
+# # Calculate cumulative regret for each algorithm
+# MW_experts_regret_T1 = calculate_cumulative_regret(actual[:T1], MW_experts_predictions_T1)
+# MW_experts_regret_T2 = calculate_cumulative_regret(actual, MW_experts_predictions_T2)
+
+# MW_bandit_regret_T1 = calculate_cumulative_regret(actual[:T1], MW_bandit_predictions_T1)
+# MW_bandit_regret_T2 = calculate_cumulative_regret(actual, MW_bandit_predictions_T2)
+
+# UCB_regret_T1 = calculate_cumulative_regret(actual[:T1], UCB_predictions_T1)
+# UCB_regret_T2 = calculate_cumulative_regret(actual, UCB_predictions_T2)
+
+# # Plot cumulative regret for each algorithm
+
+# plt.plot(MW_experts_regret_T1, label='MW with Experts T=1000')
+# #plt.plot(MW_experts_regret_T2, label='MW with Experts T=7000')
+# # plt.plot(MW_bandit_regret_T1, label='MW with Bandit T=1000')
+# # plt.plot(MW_bandit_regret_T2, label='MW with Bandit T=7000')
+# # plt.plot(UCB_regret_T1, label='UCB T=1000')
+# # plt.plot(UCB_regret_T2, label='UCB T=7000')
+# plt.xlabel('Time')
+# plt.ylabel('Cumulative Regret')
+# plt.legend()
+# plt.show()
+
+
+
